@@ -46,18 +46,6 @@ def calculateCurvature(patch_points, centroid):
     :return:
     Function receives patch and calculates curvature.
     '''
-    point_cloud = o3d.geometry.PointCloud()
-    point_cloud.points = o3d.utility.Vector3dVector(patch_points)
-
-    # Define the neighborhood search radius for curvature estimation
-    radius = 0.1  # Adjust this value based on your point cloud density
-
-    # Calculate curvature using Open3D
-    curvature = point_cloud.compute_point_cloud_curvature(radius)
-
-    # Access the curvature values and their indices in the point cloud
-    curvature_values = np.asarray(curvature[0])
-    curvature_indices = np.asarray(curvature[1])
     pass
 
 #TODO: Create calculateEigenvectorsOfPatch function.
@@ -79,5 +67,15 @@ def calculatePersistentHomology(patch_points, centroid):
     :param centroid:
     :return:
     Function receives patch of points and return the patch's persistent homology.
+    '''
+    pass
+
+#TODO: Create calculateFPFH function.
+def calculateFPFH(patch_points, centroid):
+    '''
+
+    :param patch_points:
+    :param centroid:
+    :return:
     '''
     pass
