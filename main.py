@@ -1,24 +1,47 @@
 from utils.util1 import *
 import numpy as np
-import trimesh
-from trimesh.curvature import discrete_gaussian_curvature_measure, discrete_mean_curvature_measure, sphere_ball_intersection
 import matplotlib.pyplot as plt
 import numpy as np
 import pyvista as pv
 from pyvista import examples
+import open3d as o3d
+import faiss
+import random
 
+def visualize_patches():
+    ply_point_cloud = o3d.data.PLYPointCloud()
+    pcd = o3d.io.read_point_cloud(ply_point_cloud.path)
+    # Call the sample function to obtain centroids, distances_arr, and neighbor_point_clouds
+    centroids, distances_arr, neighbor_point_clouds = sample(pcd, num_of_centroids=1000, num_of_point_in_each_patch=55)
 
-mesh = trimesh.creation.icosphere()
+    # Create a list of geometries for visualization (centroid and its neighbors)
+    geometries = []
 
-def print_hi(name):
-    print(name)
-    arr = np.array([[0,0,0],[2,2,3],[3,3,3]])
+    for centroid, neighbor_pcd in zip(centroids.points, neighbor_point_clouds):
+        # Set the color of the point cloud to red
+        color = [random.uniform(0, 1), random.uniform(0, 1), random.uniform(0, 1)]
+        neighbor_pcd.paint_uniform_color(color)
 
-    centroid = np.array([0,0])
-    arr = np.random.rand(100, 3)
+        # Append the centroid and its colored neighbor point cloud to the geometries list
+        geometries.append(neighbor_pcd)
 
-    a = calculateCurvature(arr, centroid)
-    print(a)
+    centroids.paint_uniform_color([1, 0, 0])  # Strong red color for centroids
+    geometries.append(centroids)
+    # Visualize the geometries
+    o3d.visualization.draw_geometries(geometries,
+                                      zoom=0.3412,
+                                      front=[0.4257, -0.2125, -0.8795],
+                                      lookat=[2.6172, 2.0475, 1.532],
+                                      up=[-0.0694, -0.9768, 0.2024])
+def tryPersistentHomology():
+    ply_point_cloud = o3d.data.PLYPointCloud()
+    pcd = o3d.io.read_point_cloud(ply_point_cloud.path)
+    # Call the sample function to obtain centroids, distances_arr, and neighbor_point_clouds
+    centroids, distances_arr, neighbor_point_clouds = sample(pcd, num_of_centroids=10, num_of_point_in_each_patch=55)
+    persistent_images =[]
+    for centroid, patch in zip(centroids.points, neighbor_point_clouds):
+        persistent_images.append(calculatePersistentHomology(centroid, patch.points))
+
 
 def showMeWhatYouGot():
 
@@ -46,23 +69,6 @@ def showMeWhatYouGot():
 
 # Press the green button in the gutter to run the script.
 if __name__ == '__main__':
-    arr = np.random.rand(100, 3)
-    showMeWhatYouGot()
-    # a =discrete_gaussian_curvature_measure(mesh,mesh.vertices, 0)
-    # print(type(a))
-    # print(a.shape)
-    print("Load a ply point cloud, print it, and render it")
-    ply_point_cloud = o3d.data.PLYPointCloud()
-    pcd = o3d.io.read_point_cloud(ply_point_cloud.path)
-    print(pcd)
-    print(np.asarray(pcd.points))
-    o3d.visualization.draw_plotly([pcd],
-                                      zoom=0.3412,
-                                      front=[0.4257, -0.2125, -0.8795],
-                                      lookat=[2.6172, 2.0475, 1.532],
-                                      up=[-0.0694, -0.9768, 0.2024])
-
-
-    print("hey")
+    tryPersistentHomology()
 
 # See PyCharm help at https://www.jetbrains.com/help/pycharm/
