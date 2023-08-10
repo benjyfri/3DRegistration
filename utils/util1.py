@@ -78,40 +78,29 @@ def calculateEigenvectorsOfPatch(patch_points, centroid):
     Note: smallest eigenvector is the normal of the surface.
     '''
     pass
-#TODO: Create calculatePersistentHomology function.
-def calculatePersistentHomology( centroid, patch_points ):
+
+
+def calculatePersistentHomology( centroid, patch_points, pixel_size=0.2, birth_range=(0.0, 1.0), pers_range=(0.0, 1.0) ):
     '''
 
-    :param patch_points:
-    :param centroid:
-    :return:
-    Function receives patch of points and return the patch's persistent homology.
+    :param centroid: Centroid of patch (type: numpy array)
+    :param patch_points: Neighbors of centroid in patch (type: Vector3dVector)
+    :param pixel_size: Size of pixel in persistence image
+    :param birth_range: X-axis of peristent image (type: tuple)
+    :param pers_range: Y-axis of peristent image (type: tuple)
+    :return: A list of two persistent images of H0, H1 respectively.
     '''
     np_patch_points = np.asarray(patch_points)
 
-    rips = Rips(maxdim=1, thresh=np.inf)
-    print(np_patch_points.shape)
+    rips = Rips()
     full_patch = np.append(np_patch_points , centroid.reshape((1,3)) , axis = 0)
-    data = np.random.random((55, 3))
     pdgms = rips.fit_transform(full_patch)
 
     pdgms[0] = pdgms[0][0:-1,:]
-    pimgr = PersistenceImager(pixel_size=0.2)
+    pimgr = PersistenceImager(pixel_size=pixel_size, birth_range=birth_range, pers_range=pers_range)
+    pimgs = pimgr.transform(pdgms, True)
+    return pimgs
 
-    pimgr.fit(pdgms, skew=True)
-    pimgs = pimgr.transform(pdgms, skew=True)
-    fig, axs = plt.subplots(1, 3, figsize=(10, 5))
-
-    axs[0].set_title("diagram H0")
-    pimgr.plot_diagram(pdgms[0], skew=False, ax=axs[0])
-
-
-    axs[2].set_title("Persistence Image H0")
-    pimgr.plot_image(pimgs[0], ax=axs[2])
-
-    plt.tight_layout()
-    plt.show()
-    print("k")
 #TODO: Create calculateFPFH function.
 def calculateFPFH(patch_points, centroid):
     '''

@@ -41,8 +41,36 @@ def tryPersistentHomology():
     persistent_images =[]
     for centroid, patch in zip(centroids.points, neighbor_point_clouds):
         persistent_images.append(calculatePersistentHomology(centroid, patch.points))
+    plot_persistent_images(persistent_images)
+def plot_persistent_images(persistent_images):
+    num_images = len(persistent_images)
+    fig, axs = plt.subplots(num_images, 2, figsize=(8, 2 * num_images))
 
+    for i in range(num_images):
+        H_0, H_1 = persistent_images[i]
 
+        # Plot the original image
+        ax1 = axs[i, 0]
+        im1 = ax1.imshow(H_0, cmap='viridis', interpolation='nearest')
+        ax1.set_title("H_0 Image")
+        ax1.axis('off')
+
+        # Add colorbar for H_0 image
+        cbar1 = fig.colorbar(im1, ax=ax1, fraction=0.046, pad=0.04)
+        cbar1.set_label('Value')
+
+        # Plot the persistent homology heatmap
+        ax2 = axs[i, 1]
+        im2 = ax2.imshow(H_1, cmap='plasma', interpolation='nearest')
+        ax2.set_title("H_1 Image")
+        ax2.axis('off')
+
+        # Add colorbar for H_1 image
+        cbar2 = fig.colorbar(im2, ax=ax2, fraction=0.046, pad=0.04)
+        cbar2.set_label('Value')
+
+    plt.tight_layout()
+    plt.show()
 def showMeWhatYouGot():
 
     # Sample data
