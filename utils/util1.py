@@ -56,6 +56,33 @@ def sample(pcd, num_of_centroids, num_of_point_in_each_patch):
     return centroids, distances_arr, neighbor_point_clouds
 
 
+#TODO: Create calculateSurfaces function.
+def calculateSurfaces(patch_points, centroid):
+    '''
+
+    :param patch_points:
+    :param centroid:
+    :return:
+    '''
+
+    # ELIAHU HOROWITZ STUFF: check them out!
+
+    # def get_plane_eq(unorganized_pc, ransac_n_pts=50):
+    #     o3d_pc = o3d.geometry.PointCloud(o3d.utility.Vector3dVector(unorganized_pc))
+    #     plane_model, inliers = o3d_pc.segment_plane(distance_threshold=0.004, ransac_n=ransac_n_pts,
+    #                                                 num_iterations=1000)
+    #     return plane_model
+    #
+    # def connected_components_cleaning(organized_pc, organized_rgb, image_path):
+    #     unorganized_pc = mvt_util.organized_pc_to_unorganized_pc(organized_pc)
+    #     unorganized_rgb = mvt_util.organized_pc_to_unorganized_pc(organized_rgb)
+    #
+    #     nonzero_indices = np.nonzero(np.all(unorganized_pc != 0, axis=1))[0]
+    #     unorganized_pc_no_zeros = unorganized_pc[nonzero_indices, :]
+    #     o3d_pc = o3d.geometry.PointCloud(o3d.utility.Vector3dVector(unorganized_pc_no_zeros))
+    #     labels = np.array(o3d_pc.cluster_dbscan(eps=0.006, min_points=30, print_progress=False))
+    pass
+
 #TODO: Create calculateCurvature function.
 def calculateCurvature(patch_points, centroid):
     '''
@@ -80,14 +107,14 @@ def calculateEigenvectorsOfPatch(patch_points, centroid):
     pass
 
 
-def calculatePersistentHomology( centroid, patch_points, pixel_size=0.2, birth_range=(0.0, 1.0), pers_range=(0.0, 1.0) ):
+def calculatePersistentHomology( centroid, patch_points, pixel_size=0.1, birth_range=(0.0, 1.0), pers_range=(0.0, 1.0) ):
     '''
 
-    :param centroid: Centroid of patch (type: numpy array)
-    :param patch_points: Neighbors of centroid in patch (type: Vector3dVector)
-    :param pixel_size: Size of pixel in persistence image
-    :param birth_range: X-axis of peristent image (type: tuple)
-    :param pers_range: Y-axis of peristent image (type: tuple)
+    :param centroid: Centroid of patch (type: numpy array).
+    :param patch_points: Neighbors of centroid in patch (type: Vector3dVector).
+    :param pixel_size: Size of pixel in persistence image.
+    :param birth_range: X-axis of peristent image (type: tuple).
+    :param pers_range: Y-axis of peristent image (type: tuple).
     :return: A list of two persistent images of H0, H1 respectively.
     '''
     np_patch_points = np.asarray(patch_points)
