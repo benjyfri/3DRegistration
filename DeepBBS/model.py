@@ -10,6 +10,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 from util import soft_BBS_loss_torch, guess_best_alpha_torch, cdist_torch
 
+from utils.geo_util import *
+
+
 # Part of the code is referred from: http://nlp.seas.harvard.edu/2018/04/03/attention.html#positional-encoding
 # Part of the code is referred from: https://github.com/WangYueFt/dcp
 
@@ -33,6 +36,75 @@ def knn(x, k):
     idx = pairwise_distance.topk(k=k, dim=-1)[1]  # (batch_size, num_points, k)
     return idx
 
+def get_average_FPFH( x, neighbors , batch_size , num_points , k=20 ):
+    FPFH_feats = []
+    for batch in range(batch_size):
+        FPFH_in_batch = []
+        for point in range(num_points):
+            patch = neighbors[batch, :, point, :]
+            centroid = x[batch, :, point]
+            fpfh_feat = calculateFPFH(centroid=centroid, patch_points=patch, max_nn = k)
+            FPFH_in_batch.append(fpfh_feat)
+        FPFH_feats.append(np.array(FPFH_in_batch))
+    FPFH_feats = np.array(FPFH_feats)
+    FPFH_feats_tensor = torch.tensor(FPFH_feats)
+    FPFH_feats_tensor = torch.mean(FPFH_feats_tensor, dim=-1)
+    return FPFH_feats_tensor
+def get_persistent_homology( x, neighbors , batch_size , num_points ):
+    persistent_images = []
+    for batch in range(batch_size):
+        persistent_images_in_batch = []
+        for point in range(num_points):
+            patch = neighbors[batch,:,point,:]
+            centroid = x[batch,:, point]
+            p_i = calculatePersistentHomology( centroid = centroid , patch_points = patch)
+            persistent_images_in_batch.append(np.array(p_i))
+        persistent_images.append( np.array( persistent_images_in_batch ) )
+    persistent_images = np.array(persistent_images)
+    persistent_images_tensor = torch.tensor(persistent_images)
+    flattened_persistent_images_tensor = persistent_images_tensor.view(persistent_images_tensor.size(0),persistent_images_tensor.size(1),-1)
+    return flattened_persistent_images_tensor
+def getEigens( x, neighbors , batch_size , num_points ):
+    eigen_info = []
+    for batch in range(batch_size):
+        eigen_info_in_batch = []
+        for point in range(num_points):
+            patch = neighbors[batch, :, point, :]
+            centroid = x[batch, :, point]
+            eigens = calculateSurfaceVarianceAndEigens(centroid=centroid, patch_points=patch)
+            eigens = np.array(eigens)
+            eigen_info_in_batch.append(eigens)
+        eigen_info.append(np.array(eigen_info_in_batch))
+    eigen_info = np.array(eigen_info)
+    eigen_info_tensor = torch.tensor(eigen_info)
+
+    flattened_eigen_info_tensor = eigen_info_tensor.view(eigen_info_tensor.size(0),
+                                                                       eigen_info_tensor.size(1), -1)
+    return flattened_eigen_info_tensor
+def getDensity( x, neighbors , batch_size , num_points ):
+    densities = []
+    for batch in range(batch_size):
+        densities_in_batch = []
+        for point in range(num_points):
+            patch = neighbors[batch, :, point, :]
+            centroid = x[batch, :, point]
+            centroid=centroid.reshape(3, 1)
+            density = density_ratio(x[batch,:,:], centroid, radius=0.05)
+            densities_in_batch.append(density)
+        densities.append(np.array(densities_in_batch))
+    densities = np.array(densities)
+    densities_tensor = torch.tensor(densities)
+    return densities_tensor
+def get_geo_feature(x, k=20):
+    feat = get_graph_feature(x,k)
+    batch_size, _, num_points = x.size()
+    neighbors = feat[:,0:3,:,:]
+    fpfh_tensor = get_average_FPFH(x, neighbors, batch_size, num_points, k=k)
+    persistent_images_tensor = get_persistent_homology(x, neighbors, batch_size, num_points)
+    eigen_tensor = getEigens(x, neighbors, batch_size, num_points)
+    density_tensor =  getDensity( x, neighbors , batch_size , num_points )
+    concatenated_tensor = torch.cat((density_tensor.unsqueeze(-1), eigen_tensor, persistent_images_tensor, fpfh_tensor), dim=-1)
+    return concatenated_tensor
 
 def get_graph_feature(x, k=20, large_k=None):
     # x = x.squeeze()
@@ -246,15 +318,17 @@ class DGCNN(nn.Module):
         self.conv2 = nn.Conv2d(64, 64, kernel_size=1, bias=False)
         self.conv3 = nn.Conv2d(64, 128, kernel_size=1, bias=False)
         self.conv4 = nn.Conv2d(128, 256, kernel_size=1, bias=False)
-        self.conv5 = nn.Conv2d(512, emb_dims, kernel_size=1, bias=False)
+        self.conv5 = nn.Conv2d(512, 512, kernel_size=1, bias=False)
         self.bn1 = nn.BatchNorm2d(64)
         self.bn2 = nn.BatchNorm2d(64)
         self.bn3 = nn.BatchNorm2d(128)
         self.bn4 = nn.BatchNorm2d(256)
-        self.bn5 = nn.BatchNorm2d(emb_dims)
+        self.bn5 = nn.BatchNorm2d(512)
 
     def forward(self, x):
         batch_size, num_dims, num_points = x.size()
+        added_embedding = get_geo_feature(x)
+
         x = get_graph_feature(x)
         x = F.relu(self.bn1(self.conv1(x)))
         x1 = x.max(dim=-1, keepdim=True)[0]
@@ -271,7 +345,18 @@ class DGCNN(nn.Module):
         x = torch.cat((x1, x2, x3, x4), dim=1)
 
         x = F.relu(self.bn5(self.conv5(x))).view(batch_size, -1, num_points)
-        return x
+
+        x = torch.cat((x, added_embedding.permute(0, 2, 1)), dim=1)
+        target_dim = 1024
+
+        # Calculate the amount of padding required
+        padding = target_dim - x.size(1)
+
+        # Pad the tensor along the second dimension (emb) with zeros
+        padded_tensor = torch.transpose(x, 1, 2)
+        padded_tensor = torch.nn.functional.pad(padded_tensor, (0, padding), mode='constant', value=0)
+        padded_tensor = torch.transpose(padded_tensor, 1, 2)
+        return padded_tensor
 
 
 
@@ -429,9 +514,21 @@ class DCP(nn.Module):
     def forward(self, *input):
         src = input[0]
         tgt = input[1]
+
         src_embedding = self.emb_nn(src)
         tgt_embedding = self.emb_nn(tgt)
         iter=input[2]
+
+        ############ADDED CODE##############
+        #Add to current embedding the awesome features we have
+
+        src_added_embedding = get_geo_feature(src)
+        tar_added_embedding = get_geo_feature(tgt)
+        src_embedding = torch.cat((src_embedding, src_added_embedding.permute(0, 2, 1)), dim=1)
+        tgt_embedding = torch.cat((tgt_embedding, tar_added_embedding.permute(0, 2, 1)), dim=1)
+
+        ############ADDED CODE##############
+
 
         src_embedding_p, tgt_embedding_p = self.pointer(src_embedding, tgt_embedding)
 

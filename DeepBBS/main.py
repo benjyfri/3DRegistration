@@ -136,10 +136,11 @@ def train_one_epoch(args, net, train_loader, opt, epoch):
     eulers_ab = []
 
     for src, target, rotation_ab, translation_ab, euler_ab in tqdm(train_loader):
-        src = src.cuda()
-        target = target.cuda()
-        rotation_ab = rotation_ab.cuda()
-        translation_ab = translation_ab.cuda()
+        if not args.no_cuda:
+            src = src.cuda()
+            target = target.cuda()
+            rotation_ab = rotation_ab.cuda()
+            translation_ab = translation_ab.cuda()
 
         batch_size = src.size(0)
         opt.zero_grad()
@@ -153,8 +154,10 @@ def train_one_epoch(args, net, train_loader, opt, epoch):
         rotations_ab_pred.append(rotation_ab_pred.detach().cpu().numpy())
         translations_ab_pred.append(translation_ab_pred.detach().cpu().numpy())
         eulers_ab.append(euler_ab.numpy())
-
-        identity = torch.eye(3).cuda().unsqueeze(0).repeat(batch_size, 1, 1)
+        if not args.no_cuda:
+            identity = torch.eye(3).cuda().unsqueeze(0).repeat(batch_size, 1, 1)
+        else:
+            identity = torch.eye(3).unsqueeze(0).repeat(batch_size, 1, 1)
         ind_mask = (cdist_torch(transform_point_cloud(src, rotation_ab, translation_ab), target, points_dim=3).min(dim=2).values < 0.05)
         loss = F.mse_loss(torch.matmul(rotation_ab_pred.transpose(2, 1), rotation_ab), identity) \
                + F.mse_loss(translation_ab_pred, translation_ab) \
@@ -273,7 +276,7 @@ def main():
     parser.set_defaults(DeepBBS_pp=True)
 
     ######################## Training Parameters ########################
-    parser.add_argument('--batch_size', type=int, default=32, metavar='batch_size',
+    parser.add_argument('--batch_size', type=int, default=16, metavar='batch_size',
                         help='Size of batch)')
     parser.add_argument('--epochs', type=int, default=250, metavar='N',
                         help='number of episode to train ')

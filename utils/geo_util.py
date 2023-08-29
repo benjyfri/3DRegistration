@@ -1,4 +1,4 @@
-from utils.util1 import *
+from utils.geo_util import *
 import numpy as np
 import matplotlib.pyplot as plt
 import numpy as np
@@ -9,7 +9,7 @@ import faiss
 from ripser import Rips
 from persim import PersistenceImager
 from sklearn import datasets
-
+import torch
 
 # TODO: Create k_nn function. Use FAIS by facebook for speed..?
 def k_nn(all_points, centroids, k):
@@ -95,7 +95,7 @@ def calculateCurvature(patch_points, centroid):
     pass
 
 #TODO: Create calculateEigenvectorsOfPatch function.
-def calculateEigenvectorsOfPatch(patch_points, centroid):
+def calculateEigenvectorsOfPatch(centroid, patch_points):
     '''
 
     :param patch_points:
@@ -106,7 +106,60 @@ def calculateEigenvectorsOfPatch(patch_points, centroid):
     '''
     pass
 
+def density_ratio(point_cloud, centroid, radius=0.05):
+    '''
+    Calculate the density ratio of points within a specified radius around a centroid.
 
+    :param point_cloud: PyTorch tensor of shape (num_points, 3)
+    :param centroid: PyTorch tensor of shape (3,)
+    :param radius: Radius to consider for density calculation
+    :return: Density ratio
+    '''
+    # Calculate the Euclidean distance between each point and the centroid
+    distances = torch.norm(point_cloud - centroid, dim=0)
+
+    # Count the number of points within the specified radius
+    num_points_within_radius = torch.sum(distances < radius).item()
+
+    # Calculate the total number of points in the point cloud
+    total_points = point_cloud.shape[1]
+
+    # Calculate the density ratio
+    density_ratio = num_points_within_radius / total_points
+
+    return density_ratio
+
+def calculateSurfaceVarianceAndEigens(centroid, patch_points):
+    '''
+
+    :param centroid:
+    :param patch_points:
+    :return:
+    '''
+    full_patch = patchWithCentroid(centroid, patch_points)
+    covariance = np.cov(full_patch, rowvar=False)
+    eigenvalues, eigenvectors = np.linalg.eig(covariance)
+    arr = [(val, vec) for val,vec in zip(eigenvalues, eigenvectors)]
+    eigens = sorted(arr, key=lambda x: x[0])
+    eigens = [np.append(x[0],x[1]) for x in eigens]
+    eigens = [item for sublist in eigens for item in sublist]
+    surfaceVariance = np.max(eigenvalues) / (np.sum(eigenvalues))
+    eigens.append(surfaceVariance)
+    return eigens
+def patchWithCentroid(centroid, patch_points):
+    '''
+
+    :param centroid:
+    :param patch_points:
+    :return: patch of shape( num_of_nn + 1 , 3) where the first point is the centroid (numpy array)
+    '''
+    np_patch_points = np.asarray(patch_points)
+    if np_patch_points.shape[1] != 3:
+        np_patch_points = np_patch_points.reshape((np_patch_points.shape[1], 3))
+    centroid = centroid.reshape((1, 3))
+    full_patch = np.append(centroid, np_patch_points , axis=0)
+    return full_patch
+#TODO: Maybe use non linear function in persistence image such that H1 "strong holes" will have high values.
 def calculatePersistentHomology( centroid, patch_points, pixel_size=0.1, birth_range=(0.0, 1.0), pers_range=(0.0, 1.0) ):
     '''
 
@@ -117,10 +170,9 @@ def calculatePersistentHomology( centroid, patch_points, pixel_size=0.1, birth_r
     :param pers_range: Y-axis of peristent image (type: tuple).
     :return: A list of two persistent images of H0, H1 respectively.
     '''
-    np_patch_points = np.asarray(patch_points)
 
     rips = Rips()
-    full_patch = np.append(np_patch_points , centroid.reshape((1,3)) , axis = 0)
+    full_patch = patchWithCentroid(centroid, patch_points)
     pdgms = rips.fit_transform(full_patch)
 
     pdgms[0] = pdgms[0][0:-1,:]
@@ -129,11 +181,20 @@ def calculatePersistentHomology( centroid, patch_points, pixel_size=0.1, birth_r
     return pimgs
 
 #TODO: Create calculateFPFH function.
-def calculateFPFH(patch_points, centroid):
+def calculateFPFH(patch_points, centroid, max_nn = 20):
     '''
 
     :param patch_points:
     :param centroid:
-    :return:
+    :return: FPFH
     '''
-    pass
+    full_patch = patchWithCentroid(centroid, patch_points)
+    pcd = o3d.geometry.PointCloud()
+    pcd.points = o3d.utility.Vector3dVector(full_patch)
+    pcd.estimate_normals(
+        o3d.geometry.KDTreeSearchParamKNN(knn=max_nn))
+    pcd_fpfh = o3d.pipelines.registration.compute_fpfh_feature(
+        pcd,
+        o3d.geometry.KDTreeSearchParamKNN(knn = max_nn))
+
+    return pcd_fpfh.data

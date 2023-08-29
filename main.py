@@ -1,4 +1,4 @@
-from utils.util1 import *
+from utils.geo_util import *
 import numpy as np
 import matplotlib.pyplot as plt
 import numpy as np
@@ -7,10 +7,15 @@ from pyvista import examples
 import open3d as o3d
 import faiss
 import random
-
+from persim import PersistenceImager
 def visualize_patches():
     ply_point_cloud = o3d.data.PLYPointCloud()
     pcd = o3d.io.read_point_cloud(ply_point_cloud.path)
+    o3d.visualization.draw_geometries([pcd],
+                                      zoom=0.3412,
+                                      front=[0.4257, -0.2125, -0.8795],
+                                      lookat=[2.6172, 2.0475, 1.532],
+                                      up=[-0.0694, -0.9768, 0.2024])
     # Call the sample function to obtain centroids, distances_arr, and neighbor_point_clouds
     centroids, distances_arr, neighbor_point_clouds = sample(pcd, num_of_centroids=1000, num_of_point_in_each_patch=55)
 
@@ -44,30 +49,20 @@ def tryPersistentHomology():
     plot_persistent_images(persistent_images)
 def plot_persistent_images(persistent_images):
     num_images = len(persistent_images)
+
     fig, axs = plt.subplots(num_images, 2, figsize=(8, 2 * num_images))
 
+    pimgr = PersistenceImager(pixel_size=0.5)
     for i in range(num_images):
         H_0, H_1 = persistent_images[i]
 
-        # Plot the original image
         ax1 = axs[i, 0]
-        im1 = ax1.imshow(H_0, cmap='viridis', interpolation='nearest')
-        ax1.set_title("H_0 Image")
-        ax1.axis('off')
+        ax1.set_title("H_0")
+        pimgr.plot_image(H_0, ax=ax1)
 
-        # Add colorbar for H_0 image
-        cbar1 = fig.colorbar(im1, ax=ax1, fraction=0.046, pad=0.04)
-        cbar1.set_label('Value')
-
-        # Plot the persistent homology heatmap
         ax2 = axs[i, 1]
-        im2 = ax2.imshow(H_1, cmap='plasma', interpolation='nearest')
-        ax2.set_title("H_1 Image")
-        ax2.axis('off')
-
-        # Add colorbar for H_1 image
-        cbar2 = fig.colorbar(im2, ax=ax2, fraction=0.046, pad=0.04)
-        cbar2.set_label('Value')
+        ax2.set_title("H_1")
+        pimgr.plot_image(H_1, ax=ax2)
 
     plt.tight_layout()
     plt.show()
@@ -93,10 +88,22 @@ def showMeWhatYouGot():
 
     # Display the plot
     plt.show()
-
-
+def testDensity():
+    ply_point_cloud = o3d.data.PLYPointCloud()
+    pcd = o3d.io.read_point_cloud(ply_point_cloud.path)
+    # Call the sample function to obtain centroids, distances_arr, and neighbor_point_clouds
+    centroids, distances_arr, neighbor_point_clouds = sample(pcd, num_of_centroids=10, num_of_point_in_each_patch=55)
+    eigens = []
+    for centroid, patch in zip(centroids.points, neighbor_point_clouds):
+        eigens.append(density_ratio(pcd.points, centroid,  0.05))
+    print(eigens)
+def readData():
+    # ply_path = "G://My Drive//3DRegistration//3dmatch//train//7-scenes-chess//fragments//cloud_bin_0.ply"
+    # ply = o3d.io.read_point_cloud(ply_path)
+    # print(ply)
+    pass
 # Press the green button in the gutter to run the script.
 if __name__ == '__main__':
-    tryPersistentHomology()
+    testDensity()
 
 # See PyCharm help at https://www.jetbrains.com/help/pycharm/
