@@ -1,4 +1,4 @@
-from utils.geo_util import *
+from DeepBBS.geo_util import *
 import numpy as np
 import matplotlib.pyplot as plt
 import numpy as np
@@ -8,6 +8,7 @@ import open3d as o3d
 import faiss
 import random
 from persim import PersistenceImager
+from utils.geo_util import sample
 def visualize_patches():
     ply_point_cloud = o3d.data.PLYPointCloud()
     pcd = o3d.io.read_point_cloud(ply_point_cloud.path)
@@ -95,7 +96,7 @@ def testDensity():
     centroids, distances_arr, neighbor_point_clouds = sample(pcd, num_of_centroids=10, num_of_point_in_each_patch=55)
     eigens = []
     for centroid, patch in zip(centroids.points, neighbor_point_clouds):
-        eigens.append(density_ratio(pcd.points, centroid,  0.05))
+        eigens.append(calculateFPFH(torch.tensor(pcd.points), torch.tensor(centroid),  0.05))
     print(eigens)
 def readData():
     # ply_path = "G://My Drive//3DRegistration//3dmatch//train//7-scenes-chess//fragments//cloud_bin_0.ply"
